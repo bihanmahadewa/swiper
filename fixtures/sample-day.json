@@ -1,0 +1,32 @@
+[
+  {
+    "eventId": "evt_a",
+    "timestampStart": "2026-04-05T09:00:00.000Z",
+    "timestampEnd": "2026-04-05T09:00:00.000Z",
+    "durationMs": 0,
+    "source": "browser",
+    "eventType": "browser_navigation",
+    "appBundleId": "com.apple.Safari",
+    "appName": "Safari",
+    "windowTitle": "Shipping report dashboard",
+    "url": "https://analytics.example.com/reports/shipping",
+    "documentPath": null,
+    "rawPayload": {},
+    "confidence": 0.95
+  },
+  {
+    "eventId": "evt_b",
+    "timestampStart": "2026-04-05T09:30:00.000Z",
+    "timestampEnd": "2026-04-05T09:30:00.000Z",
+    "durationMs": 0,
+    "source": "editor",
+    "eventType": "document_focus",
+    "appBundleId": "com.todesktop.230313mzl4w4u92",
+    "appName": "Cursor",
+    "windowTitle": "notes.md - swiper",
+    "url": null,
+    "documentPath": "/Users/bm/Developer/swiper/notes.md",
+    "rawPayload": {},
+    "confidence": 0.95
+  }
+]

@@ -1,0 +1,13 @@
+.DS_Store
+node_modules/
+.build/
+.swiftpm/
+daily/
+runtime/
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/runtime/
+data/daily/
+*.xcuserstate
+DerivedData/
