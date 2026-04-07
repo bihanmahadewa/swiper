@@ -9,7 +9,7 @@ struct SwiperMenuBarApp: App {
                 .environmentObject(appState)
                 .frame(width: 320)
         } label: {
-            Label("Swiper", systemImage: appState.trackerStatus?.state == "watching" ? "record.circle.fill" : "pause.circle")
+            Label(appState.menuBarTitle(), systemImage: appState.trackerStatus?.state == "watching" ? "record.circle.fill" : "pause.circle")
         }
         .menuBarExtraStyle(.window)
         .commands {

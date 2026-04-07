@@ -3,7 +3,6 @@ import AppKit
 
 struct ContentView: View {
     @EnvironmentObject private var appState: AppState
-    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -31,19 +30,8 @@ struct ContentView: View {
 
             Divider()
 
-            Button("Check Permissions") {
-                _ = appState.ensurePermissions()
-            }
-
-            Button("Open Accessibility Settings") {
-                appState.openAccessibilitySettings()
-            }
-
-            Divider()
-
             Button("Get Report") {
-                appState.loadTodaysReport()
-                openWindow(id: "report")
+                appState.showReportWindow()
             }
 
             Divider()
@@ -81,7 +69,7 @@ struct ContentView: View {
                 Text("Tracking On")
                     .font(.subheadline.weight(.semibold))
 
-                Text("Elapsed: \(appState.elapsedTrackingText())")
+                Text("Elapsed: \(appState.elapsedTrackingText(now: appState.now))")
                     .font(.system(.body, design: .monospaced))
 
                 Text("Events: \(status.totalEvents)  Ticks: \(status.ticks)")
@@ -99,6 +87,11 @@ struct ContentView: View {
                 Text("Tracking Off")
                     .font(.subheadline.weight(.semibold))
                 Text("Start tracking to write daily JSON snapshots in the background.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text("Start Tracking will ask for macOS permissions the first time if needed.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

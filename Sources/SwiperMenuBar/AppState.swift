@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import AppKit
 import Darwin
+import ApplicationServices
 
 struct TrackerStatus: Decodable {
     let state: String
@@ -118,6 +119,7 @@ final class AppState: ObservableObject {
     @Published var trackerStatus: TrackerStatus?
     @Published var dailyReport: DailyReport?
     @Published var lastError: String?
+    @Published var now: Date = .init()
     @Published var doctorReport: DoctorReport?
 
     let repoURL: URL
@@ -127,6 +129,7 @@ final class AppState: ObservableObject {
 
     private var process: Process?
     private var timer: Timer?
+    private var reportWindowController: NSWindowController?
 
     init() {
         let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
@@ -140,6 +143,7 @@ final class AppState: ObservableObject {
         refreshStatus()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
+                self?.now = Date()
                 self?.refreshStatus()
             }
         }
@@ -155,7 +159,7 @@ final class AppState: ObservableObject {
             return
         }
 
-        guard ensurePermissions() else {
+        guard ensurePermissions(prompt: true) else {
             return
         }
 
@@ -222,7 +226,12 @@ final class AppState: ObservableObject {
     }
 
     @discardableResult
-    func ensurePermissions() -> Bool {
+    func ensurePermissions(prompt: Bool = false) -> Bool {
+        if !ensureAccessibility(prompt: prompt) {
+            lastError = "Swiper needs Accessibility access before tracking can start."
+            return false
+        }
+
         guard let report = runDoctor() else {
             lastError = "Could not run the Swiper doctor check."
             return false
@@ -231,8 +240,7 @@ final class AppState: ObservableObject {
         doctorReport = report
 
         if let error = report.frontmostApp.error {
-            lastError = "Tracking needs macOS permissions before it can start. \(error.message)"
-            openAccessibilitySettings()
+            lastError = "Swiper needs Automation permission for System Events before tracking can start. \(error.message)"
             return false
         }
 
@@ -298,6 +306,36 @@ final class AppState: ObservableObject {
         NSWorkspace.shared.open(url)
     }
 
+    func showReportWindow() {
+        loadTodaysReport()
+
+        let rootView = ReportView()
+            .environmentObject(self)
+        let hostingController = NSHostingController(rootView: rootView)
+
+        if let window = reportWindowController?.window {
+            window.contentViewController = hostingController
+            window.makeKeyAndOrderFront(nil)
+            NSApplication.shared.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 680, height: 560),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Swiper Report"
+        window.contentViewController = hostingController
+        window.center()
+
+        let controller = NSWindowController(window: window)
+        self.reportWindowController = controller
+        controller.showWindow(nil)
+        NSApplication.shared.activate(ignoringOtherApps: true)
+    }
+
     private func localDayString() -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
@@ -319,6 +357,14 @@ final class AppState: ObservableObject {
 
     func formatDuration(ms: Int) -> String {
         format(duration: ms / 1000)
+    }
+
+    func menuBarTitle() -> String {
+        guard trackerStatus?.state == "watching" else {
+            return "Swiper"
+        }
+
+        return "Swiper \(elapsedTrackingText(now: now))"
     }
 
     private func runDoctor() -> DoctorReport? {
@@ -345,5 +391,11 @@ final class AppState: ObservableObject {
             lastError = error.localizedDescription
             return nil
         }
+    }
+
+    private func ensureAccessibility(prompt: Bool) -> Bool {
+        let key = "AXTrustedCheckOptionPrompt"
+        let options = [key: prompt] as CFDictionary
+        return AXIsProcessTrustedWithOptions(options)
     }
 }
