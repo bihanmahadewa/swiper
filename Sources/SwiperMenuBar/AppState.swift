@@ -7,6 +7,7 @@ import ApplicationServices
 struct TrackerStatus: Decodable {
     let state: String
     let mode: String
+    let sessionId: String?
     let dbPath: String
     let intervalMs: Int
     let durationMs: Int?
@@ -18,6 +19,8 @@ struct TrackerStatus: Decodable {
     let reportDay: String
     let statusPath: String
     let dailyDir: String
+    let sessionsDir: String?
+    let latestSessionPath: String?
     let pid: Int32
 }
 
@@ -126,10 +129,10 @@ final class AppState: ObservableObject {
     let dbURL: URL
     let statusURL: URL
     let dailyDirURL: URL
+    let sessionsDirURL: URL
 
     private var process: Process?
     private var timer: Timer?
-    private var reportWindowController: NSWindowController?
 
     init() {
         let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
@@ -137,6 +140,7 @@ final class AppState: ObservableObject {
         self.dbURL = cwd.appendingPathComponent("data/swiper-menubar.db")
         self.statusURL = cwd.appendingPathComponent("data/runtime/swiper-menubar-status.json")
         self.dailyDirURL = cwd.appendingPathComponent("data/daily")
+        self.sessionsDirURL = cwd.appendingPathComponent("data/sessions")
     }
 
     func startPolling() {
@@ -170,6 +174,10 @@ final class AppState: ObservableObject {
             )
             try FileManager.default.createDirectory(
                 at: repoURL.appendingPathComponent("data/daily"),
+                withIntermediateDirectories: true
+            )
+            try FileManager.default.createDirectory(
+                at: repoURL.appendingPathComponent("data/sessions"),
                 withIntermediateDirectories: true
             )
         } catch {
@@ -250,30 +258,15 @@ final class AppState: ObservableObject {
 
     func elapsedTrackingText(now: Date = Date()) -> String {
         guard let status = trackerStatus,
-              status.state == "watching",
-              let started = ISO8601DateFormatter().date(from: status.startedAt) else {
+              status.state == "watching" else {
             return "Not tracking"
         }
 
-        return format(duration: Int(now.timeIntervalSince(started)))
-    }
-
-    func openDailyJSONFolder() {
-        NSWorkspace.shared.open(dailyDirURL)
-    }
-
-    func openDatabaseFolder() {
-        NSWorkspace.shared.open(dbURL.deletingLastPathComponent())
-    }
-
-    func openTodaysJSON() {
-        let filename = "\(localDayString()).json"
-        let fileURL = dailyDirURL.appendingPathComponent(filename)
-        if FileManager.default.fileExists(atPath: fileURL.path) {
-            NSWorkspace.shared.open(fileURL)
-        } else {
-            NSWorkspace.shared.open(dailyDirURL)
+        if let started = iso8601Formatter.date(from: status.startedAt) {
+            return format(duration: Int(now.timeIntervalSince(started)))
         }
+
+        return format(duration: status.trackedDurationMs / 1000)
     }
 
     func loadTodaysReport() {
@@ -306,34 +299,22 @@ final class AppState: ObservableObject {
         NSWorkspace.shared.open(url)
     }
 
-    func showReportWindow() {
-        loadTodaysReport()
-
-        let rootView = ReportView()
-            .environmentObject(self)
-        let hostingController = NSHostingController(rootView: rootView)
-
-        if let window = reportWindowController?.window {
-            window.contentViewController = hostingController
-            window.makeKeyAndOrderFront(nil)
-            NSApplication.shared.activate(ignoringOtherApps: true)
+    func sendTodaysStatsToChatGPT() {
+        guard let payload = todaysStatsPayload() else {
+            lastError = "No tracked session found yet."
             return
         }
 
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 680, height: 560),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = "Swiper Report"
-        window.contentViewController = hostingController
-        window.center()
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(payload, forType: .string)
 
-        let controller = NSWindowController(window: window)
-        self.reportWindowController = controller
-        controller.showWindow(nil)
-        NSApplication.shared.activate(ignoringOtherApps: true)
+        guard let url = URL(string: "https://chatgpt.com/") else {
+            lastError = "Could not open ChatGPT."
+            return
+        }
+        lastError = "Latest session JSON was copied to your clipboard. Paste it into ChatGPT to start the conversation."
+        openChatGPT(url)
     }
 
     private func localDayString() -> String {
@@ -397,5 +378,79 @@ final class AppState: ObservableObject {
         let key = "AXTrustedCheckOptionPrompt"
         let options = [key: prompt] as CFDictionary
         return AXIsProcessTrustedWithOptions(options)
+    }
+
+    private var iso8601Formatter: ISO8601DateFormatter {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }
+
+    private func todaysStatsPayload() -> String? {
+        guard let fileURL = latestSessionFileURL() else {
+            return nil
+        }
+
+        guard let data = try? Data(contentsOf: fileURL),
+              let report = try? JSONDecoder().decode(DailyReport.self, from: data) else {
+            return nil
+        }
+
+        let payload = report.rawTimeline.map { entry in
+            [
+                "sessionId": entry.sessionId,
+                "timestampStart": entry.timestampStart,
+                "timestampEnd": entry.timestampEnd,
+                "taskLabel": entry.taskLabel,
+                "dominantAppName": entry.dominantAppName as Any,
+                "dominantUrl": entry.dominantUrl as Any,
+                "dominantDocumentPath": entry.dominantDocumentPath as Any,
+            ]
+        }
+
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted]),
+              let jsonString = String(data: jsonData, encoding: .utf8) else {
+            return nil
+        }
+
+        return jsonString
+    }
+
+    private func latestSessionFileURL() -> URL? {
+        if let latestSessionPath = trackerStatus?.latestSessionPath {
+            return URL(fileURLWithPath: latestSessionPath)
+        }
+
+        if let sessionId = trackerStatus?.sessionId {
+            return sessionsDirURL.appendingPathComponent("\(sessionId).json")
+        }
+
+        return nil
+    }
+
+    private func openChatGPT(_ url: URL) {
+        if let chatGPTURL = URL(string: "chatgpt://"),
+           NSWorkspace.shared.open(chatGPTURL) {
+            return
+        }
+
+        openInSafari(url)
+    }
+
+    private func openInSafari(_ url: URL) {
+        let safariURL = URL(fileURLWithPath: "/Applications/Safari.app")
+        let configuration = NSWorkspace.OpenConfiguration()
+
+        if FileManager.default.fileExists(atPath: safariURL.path) {
+            NSWorkspace.shared.open([url], withApplicationAt: safariURL, configuration: configuration) { _, error in
+                Task { @MainActor in
+                    if let error {
+                        self.lastError = "Could not open Safari: \(error.localizedDescription)"
+                    }
+                }
+            }
+        } else {
+            NSWorkspace.shared.open(url)
+        }
     }
 }

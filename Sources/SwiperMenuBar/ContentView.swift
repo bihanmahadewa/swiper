@@ -14,7 +14,7 @@ struct ContentView: View {
             Divider()
 
             HStack {
-                Button(appState.trackerStatus?.state == "watching" ? "Pause Tracking" : "Start Tracking") {
+                Button(appState.trackerStatus?.state == "watching" ? "Stop Timer" : "Start Timer") {
                     if appState.trackerStatus?.state == "watching" {
                         appState.pauseTracking()
                     } else {
@@ -22,30 +22,9 @@ struct ContentView: View {
                     }
                 }
 
-                Button("Quit Swiper") {
-                    appState.handleAppTermination()
-                    NSApplication.shared.terminate(nil)
+                Button("Get Stats") {
+                    appState.sendTodaysStatsToChatGPT()
                 }
-            }
-
-            Divider()
-
-            Button("Get Report") {
-                appState.showReportWindow()
-            }
-
-            Divider()
-
-            Button("Open Today's JSON") {
-                appState.openTodaysJSON()
-            }
-
-            Button("Open Daily JSON Folder") {
-                appState.openDailyJSONFolder()
-            }
-
-            Button("Open Database Folder") {
-                appState.openDatabaseFolder()
             }
 
             if let error = appState.lastError {
@@ -53,6 +32,13 @@ struct ContentView: View {
                 Text(error)
                     .font(.caption)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Divider()
+
+            Button("Quit Swiper") {
+                appState.handleAppTermination()
+                NSApplication.shared.terminate(nil)
             }
         }
         .padding(14)
@@ -71,22 +57,12 @@ struct ContentView: View {
 
                 Text("Elapsed: \(appState.elapsedTrackingText(now: appState.now))")
                     .font(.system(.body, design: .monospaced))
-
-                Text("Events: \(status.totalEvents)  Ticks: \(status.ticks)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                if let lastTickAt = status.lastTickAt {
-                    Text("Last tick: \(lastTickAt)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
             }
         } else {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Tracking Off")
                     .font(.subheadline.weight(.semibold))
-                Text("Start tracking to write daily JSON snapshots in the background.")
+                Text("Start timer to track app switches and write today's JSON in the background.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

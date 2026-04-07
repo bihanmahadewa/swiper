@@ -6,11 +6,13 @@ export function createRuntimePaths(dbPath) {
   const baseDir = path.resolve(path.dirname(dbPath));
   const runtimeDir = path.join(baseDir, "runtime");
   const dailyDir = path.join(baseDir, "daily");
+  const sessionsDir = path.join(baseDir, "sessions");
 
   return {
     baseDir,
     runtimeDir,
     dailyDir,
+    sessionsDir,
     statusPath: path.join(runtimeDir, `${dbName}-status.json`),
   };
 }
@@ -18,6 +20,7 @@ export function createRuntimePaths(dbPath) {
 export function ensureRuntimeDirectories(paths) {
   fs.mkdirSync(paths.runtimeDir, { recursive: true });
   fs.mkdirSync(paths.dailyDir, { recursive: true });
+  fs.mkdirSync(paths.sessionsDir, { recursive: true });
 }
 
 export function writeJsonFile(filePath, value) {

@@ -20,11 +20,5 @@ struct SwiperMenuBarApp: App {
                 }
             }
         }
-
-        WindowGroup("Report", id: "report") {
-            ReportView()
-                .environmentObject(appState)
-        }
-        .defaultSize(width: 680, height: 560)
     }
 }

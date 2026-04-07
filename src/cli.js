@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { MacOSCollector, runDoctor } from "./collectors/macos.js";
-import { exportDailyJson } from "./exports.js";
+import { exportDailyJson, exportSessionJson } from "./exports.js";
 import { SwiperEngine } from "./pipeline.js";
 import { GraphQuery } from "./query.js";
 import { clearTrackerStatus, createRuntimePaths, ensureRuntimeDirectories, writeTrackerStatus } from "./runtime.js";
@@ -114,6 +114,7 @@ async function runTracker({ dbPath, options, mode }) {
   const engine = createLiveEngine(dbPath);
   const stopAt = options.durationMs ? Date.now() + options.durationMs : null;
   const startedAt = new Date().toISOString();
+  const sessionId = startedAt.replaceAll(":", "-").replaceAll(".", "-");
   const runtimePaths = createRuntimePaths(dbPath);
   ensureRuntimeDirectories(runtimePaths);
 
@@ -128,6 +129,7 @@ async function runTracker({ dbPath, options, mode }) {
     writeTrackerStatus(runtimePaths.statusPath, {
       state,
       mode,
+      sessionId,
       dbPath,
       intervalMs: options.intervalMs,
       durationMs: options.durationMs,
@@ -139,6 +141,8 @@ async function runTracker({ dbPath, options, mode }) {
       reportDay,
       statusPath: runtimePaths.statusPath,
       dailyDir: runtimePaths.dailyDir,
+      sessionsDir: runtimePaths.sessionsDir,
+      latestSessionPath: path.join(runtimePaths.sessionsDir, `${sessionId}.json`),
       pid: process.pid,
     });
   };
@@ -210,6 +214,7 @@ async function runTracker({ dbPath, options, mode }) {
     const day = new Date().toISOString().slice(0, 10);
     const report = new GraphQuery(dbPath).dailyBehaviorReport(day);
     const exportPath = exportDailyJson({ dbPath, day, report });
+    const sessionExportPath = exportSessionJson({ dbPath, sessionId, report });
 
     updateStatus("watching");
 
@@ -223,6 +228,7 @@ async function runTracker({ dbPath, options, mode }) {
             storedEvents: events.length,
             totalEvents,
             exportPath,
+            sessionExportPath,
           },
           null,
           2,
