@@ -9,11 +9,11 @@ export function exportDailyJson({ dbPath, day, report }) {
   return exportPath;
 }
 
-export function exportSessionJson({ dbPath, sessionId, report }) {
+export function exportSessionJson({ dbPath, sessionId, sessionStartedAt, report }) {
   const paths = createRuntimePaths(dbPath);
   ensureRuntimeDirectories(paths);
   const exportPath = path.join(paths.sessionsDir, `${sessionId}.json`);
-  writeJsonFile(exportPath, sessionScopedReport(report, sessionIdToTimestamp(sessionId)));
+  writeJsonFile(exportPath, sessionScopedReport(report, sessionStartedAt));
   return exportPath;
 }
 
@@ -37,11 +37,6 @@ function sessionScopedReport(report, sessionStartedAt) {
     rawTimeline,
     summary: [],
   };
-}
-
-function sessionIdToTimestamp(sessionId) {
-  const isoBase = sessionId.replace(/-/g, ":");
-  return isoBase.replace(/^(\d{4}):(\d{2}):(\d{2})T(\d{2}):(\d{2}):(\d{2}):(\d{3})Z$/, "$1-$2-$3T$4:$5:$6.$7Z");
 }
 
 function aggregateUsage(entries, keyFn, labelKey, durationKey, extrasFn = null) {

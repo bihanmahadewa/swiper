@@ -6,6 +6,7 @@ import { SwiperEngine } from "./pipeline.js";
 import { GraphQuery } from "./query.js";
 import { clearTrackerStatus, createRuntimePaths, ensureRuntimeDirectories, writeTrackerStatus } from "./runtime.js";
 import { SwiperStore } from "./store.js";
+import { toDay, toLocalTimestamp } from "./util.js";
 
 async function main() {
   const [, , command, ...args] = process.argv;
@@ -68,7 +69,7 @@ async function handleDaemon(args) {
 
 function handleReportDay(args) {
   const dbPath = resolveDbPath(args[0]);
-  const day = args[1] ?? new Date().toISOString().slice(0, 10);
+  const day = args[1] ?? toDay(new Date());
   const query = new GraphQuery(dbPath);
   const report = query.dailyBehaviorReport(day);
   console.log(JSON.stringify(report, null, 2));
@@ -113,8 +114,8 @@ function createLiveEngine(dbPath) {
 async function runTracker({ dbPath, options, mode }) {
   const engine = createLiveEngine(dbPath);
   const stopAt = options.durationMs ? Date.now() + options.durationMs : null;
-  const startedAt = new Date().toISOString();
-  const sessionId = startedAt.replaceAll(":", "-").replaceAll(".", "-");
+  const startedAt = toLocalTimestamp();
+  const sessionId = startedAt.replace(/[^0-9A-Za-z]/g, "-");
   const runtimePaths = createRuntimePaths(dbPath);
   ensureRuntimeDirectories(runtimePaths);
 
@@ -125,7 +126,7 @@ async function runTracker({ dbPath, options, mode }) {
   let lastTickAt = null;
 
   const updateStatus = (state) => {
-    const reportDay = new Date().toISOString().slice(0, 10);
+    const reportDay = toDay(new Date());
     writeTrackerStatus(runtimePaths.statusPath, {
       state,
       mode,
@@ -209,12 +210,12 @@ async function runTracker({ dbPath, options, mode }) {
     const events = await engine.collectOnce();
     ticks += 1;
     totalEvents += events.length;
-    lastTickAt = new Date().toISOString();
+    lastTickAt = toLocalTimestamp();
 
-    const day = new Date().toISOString().slice(0, 10);
+    const day = toDay(new Date());
     const report = new GraphQuery(dbPath).dailyBehaviorReport(day);
     const exportPath = exportDailyJson({ dbPath, day, report });
-    const sessionExportPath = exportSessionJson({ dbPath, sessionId, report });
+    const sessionExportPath = exportSessionJson({ dbPath, sessionId, sessionStartedAt: startedAt, report });
 
     updateStatus("watching");
 

@@ -10,11 +10,29 @@ export function createId(prefix, ...parts) {
 }
 
 export function toIsoDate(input) {
-  return new Date(input).toISOString();
+  return toLocalTimestamp(input);
 }
 
 export function toDay(input) {
-  return toIsoDate(input).slice(0, 10);
+  return toLocalTimestamp(input).slice(0, 10);
+}
+
+export function toLocalTimestamp(input = new Date()) {
+  const date = input instanceof Date ? input : new Date(input);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  const milliseconds = String(date.getMilliseconds()).padStart(3, "0");
+  const offsetMinutes = -date.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? "+" : "-";
+  const absOffsetMinutes = Math.abs(offsetMinutes);
+  const offsetHours = String(Math.floor(absOffsetMinutes / 60)).padStart(2, "0");
+  const offsetRemainder = String(absOffsetMinutes % 60).padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${milliseconds}${sign}${offsetHours}:${offsetRemainder}`;
 }
 
 export function durationMs(start, end) {

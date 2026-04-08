@@ -1,5 +1,5 @@
 import { querySql } from "./sqlite.js";
-import { parseJson, sqlQuote } from "./util.js";
+import { parseJson, sqlQuote, toLocalTimestamp } from "./util.js";
 
 export class GraphQuery {
   constructor(dbPath) {
@@ -170,9 +170,9 @@ function deriveBehaviorTimeline(entries) {
 
     const effectiveDurationMs = Math.max(current.durationMs, observedDurationMs, closedDurationMs);
     current.durationMs = effectiveDurationMs;
-    current.timestampEnd = new Date(
-      new Date(current.timestampStart).getTime() + effectiveDurationMs,
-    ).toISOString();
+    current.timestampEnd = toLocalTimestamp(
+      new Date(new Date(current.timestampStart).getTime() + effectiveDurationMs),
+    );
   }
 
   return normalized;

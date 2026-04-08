@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { Collector } from "./base.js";
-import { createId, normalizePath } from "../util.js";
+import { createId, normalizePath, toLocalTimestamp } from "../util.js";
 
 const FRONTMOST_APP_SCRIPT = `
 tell application "System Events"
@@ -32,7 +32,7 @@ export class MacOSCollector extends Collector {
 }
 
 export function captureSnapshot(idleThresholdMs = 5 * 60 * 1000) {
-  const timestamp = new Date().toISOString();
+  const timestamp = toLocalTimestamp();
   const frontmostResult = runAppleScript(FRONTMOST_APP_SCRIPT);
   const frontmost = parseFrontmostApp(frontmostResult.output);
   const browserContext = captureBrowserContext(frontmost.appName);
@@ -68,7 +68,7 @@ export function runDoctor() {
   const idleMs = readIdleMs();
 
   return {
-    timestamp: new Date().toISOString(),
+    timestamp: toLocalTimestamp(),
     frontmostApp: {
       appName: frontmost.appName,
       appBundleId: frontmost.appBundleId,

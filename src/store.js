@@ -49,7 +49,7 @@ export class SwiperStore {
     return querySql(
       this.dbPath,
       `SELECT * FROM raw_events
-       WHERE date(timestamp_start) = ${sqlQuote(day)}
+       WHERE substr(timestamp_start, 1, 10) = ${sqlQuote(day)}
        ORDER BY timestamp_start ASC, event_id ASC;`,
     ).map((row) => ({
       eventId: row.event_id,

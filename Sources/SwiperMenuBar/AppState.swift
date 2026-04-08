@@ -300,20 +300,20 @@ final class AppState: ObservableObject {
     }
 
     func sendTodaysStatsToChatGPT() {
-        guard let payload = todaysStatsPayload() else {
+        refreshStatus()
+
+        guard let fileURL = latestSessionFileURL() else {
             lastError = "No tracked session found yet."
             return
         }
-
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(payload, forType: .string)
 
         guard let url = URL(string: "https://chatgpt.com/") else {
             lastError = "Could not open ChatGPT."
             return
         }
-        lastError = "Latest session JSON was copied to your clipboard. Paste it into ChatGPT to start the conversation."
+
+        NSWorkspace.shared.activateFileViewerSelecting([fileURL])
+        lastError = "Opened ChatGPT and revealed the latest session JSON in Finder so you can attach the exact file."
         openChatGPT(url)
     }
 
@@ -386,46 +386,33 @@ final class AppState: ObservableObject {
         return formatter
     }
 
-    private func todaysStatsPayload() -> String? {
-        guard let fileURL = latestSessionFileURL() else {
-            return nil
-        }
-
-        guard let data = try? Data(contentsOf: fileURL),
-              let report = try? JSONDecoder().decode(DailyReport.self, from: data) else {
-            return nil
-        }
-
-        let payload = report.rawTimeline.map { entry in
-            [
-                "sessionId": entry.sessionId,
-                "timestampStart": entry.timestampStart,
-                "timestampEnd": entry.timestampEnd,
-                "taskLabel": entry.taskLabel,
-                "dominantAppName": entry.dominantAppName as Any,
-                "dominantUrl": entry.dominantUrl as Any,
-                "dominantDocumentPath": entry.dominantDocumentPath as Any,
-            ]
-        }
-
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted]),
-              let jsonString = String(data: jsonData, encoding: .utf8) else {
-            return nil
-        }
-
-        return jsonString
-    }
-
     private func latestSessionFileURL() -> URL? {
-        if let latestSessionPath = trackerStatus?.latestSessionPath {
-            return URL(fileURLWithPath: latestSessionPath)
+        let fileManager = FileManager.default
+        guard let fileURLs = try? fileManager.contentsOfDirectory(
+            at: sessionsDirURL,
+            includingPropertiesForKeys: [.contentModificationDateKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return nil
         }
 
-        if let sessionId = trackerStatus?.sessionId {
-            return sessionsDirURL.appendingPathComponent("\(sessionId).json")
+        let jsonFiles = fileURLs.filter { $0.pathExtension.lowercased() == "json" }
+        if jsonFiles.isEmpty {
+            return nil
         }
 
-        return nil
+        let sorted = jsonFiles.sorted { left, right in
+            let leftDate = (try? left.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            let rightDate = (try? right.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+
+            if leftDate != rightDate {
+                return leftDate > rightDate
+            }
+
+            return left.lastPathComponent > right.lastPathComponent
+        }
+
+        return sorted.first
     }
 
     private func openChatGPT(_ url: URL) {
