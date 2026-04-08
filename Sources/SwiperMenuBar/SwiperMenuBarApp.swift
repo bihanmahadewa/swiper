@@ -4,6 +4,15 @@ struct SwiperMenuBarApp: App {
     @StateObject private var appState = AppState()
 
     var body: some Scene {
+        WindowGroup("Swiper") {
+            ReportView()
+                .environmentObject(appState)
+                .onAppear {
+                    appState.refreshSessionNotes()
+                }
+        }
+        .defaultSize(width: 760, height: 620)
+
         MenuBarExtra {
             ContentView()
                 .environmentObject(appState)

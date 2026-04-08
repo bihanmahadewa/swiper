@@ -27,6 +27,14 @@ struct ContentView: View {
                 }
             }
 
+            Button("Open Swiper") {
+                appState.refreshSessionNotes()
+                NSApplication.shared.activate(ignoringOtherApps: true)
+                for window in NSApplication.shared.windows where window.title == "Swiper" {
+                    window.makeKeyAndOrderFront(nil)
+                }
+            }
+
             if let error = appState.lastError {
                 Divider()
                 Text(error)
